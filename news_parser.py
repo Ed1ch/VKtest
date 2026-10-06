@@ -37,6 +37,19 @@ def check_pandoc():
         )
 
 
+def normalize_html_whitespace(html_content):
+    """
+    Убирает физические переводы строк и лишние пробелы
+    из HTML, не изменяя структуру тегов.
+    """
+
+    return re.sub(
+        r"\s+",
+        " ",
+        html_content
+    ).strip()
+
+
 def convert_docx_to_html(data):
     """
     Конвертирует DOCX в HTML через Pandoc.
@@ -87,6 +100,71 @@ def convert_docx_to_html(data):
             pass
 
 
+def html_to_plain_text(html_content):
+    """
+    Преобразует HTML в обычный текст для excerpt.
+    """
+
+    import html
+
+    text = html_content
+
+    # Абзацы превращаем в разделители текста.
+    text = re.sub(
+        r"<p\b[^>]*>",
+        "",
+        text,
+        flags=re.IGNORECASE
+    )
+
+    text = re.sub(
+        r"</p\s*>",
+        "\n\n",
+        text,
+        flags=re.IGNORECASE
+    )
+
+    # Переносы строк HTML.
+    text = re.sub(
+        r"<br\s*/?>",
+        "\n",
+        text,
+        flags=re.IGNORECASE
+    )
+
+    # Удаляем остальные HTML-теги.
+    text = re.sub(
+        r"<[^>]+>",
+        "",
+        text
+    )
+
+    # HTML entities: &quot;, &amp;, &nbsp; и т.д.
+    text = html.unescape(text)
+
+    # Неразрывные пробелы превращаем в обычные.
+    text = text.replace(
+        "\xa0",
+        " "
+    )
+
+    # Убираем лишние пробелы.
+    text = re.sub(
+        r"[ \t]+",
+        " ",
+        text
+    )
+
+    # Нормализуем пустые строки.
+    text = re.sub(
+        r"\n\s*\n+",
+        "\n\n",
+        text
+    )
+
+    return text.strip()
+
+
 def extract_title_and_content(data):
     """
     Получает title из первого непустого абзаца DOCX,
@@ -108,7 +186,11 @@ def extract_title_and_content(data):
             "Документ не содержит текста."
         )
 
-    title = paragraphs[0]
+    title = re.sub(
+        r"\s+",
+        " ",
+        paragraphs[0]
+    ).strip()
 
     html_content = convert_docx_to_html(data)
 
@@ -120,7 +202,7 @@ def extract_title_and_content(data):
     return title, html_content
 
 
-def html_to_plain_text(html_content):
+
     """
     Упрощённо удаляет HTML-теги для построения excerpt.
     """
@@ -140,8 +222,8 @@ def html_to_plain_text(html_content):
     )
 
     text = re.sub(
-        r"<[^>]+>",
-        "",
+        r"\s+",
+        " ",
         text
     )
 
@@ -202,17 +284,23 @@ def read_docx(data):
     # Убираем его из HTML-контента Pandoc,
     # чтобы WordPress не дублировал заголовок.
     html_content = re.sub(
-    r"^\s*<p>.*?</p>\s*",
-    "",
-    html_content,
-    count=1,
-    flags=re.IGNORECASE | re.DOTALL
+        r"^\s*<p>.*?</p>\s*",
+        "",
+        html_content,
+        count=1,
+        flags=re.IGNORECASE | re.DOTALL
     )
 
     if not html_content.strip():
         raise ValueError(
             "После title нет текста."
         )
+
+    # Убираем физические переводы строк
+    # и лишние пробелы из HTML.
+    html_content = normalize_html_whitespace(
+        html_content
+    )
 
     excerpt = build_excerpt(
         html_content

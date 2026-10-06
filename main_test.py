@@ -72,8 +72,8 @@ def process_vk(
         news["vk_embed"] = (
             f'<iframe '
             f'src="{html.escape(player)}" '
-            f'width="640" '
-            f'height="360" '
+            f'width="853" '
+            f'height="480" '
             f'frameborder="0" '
             f'allowfullscreen></iframe>'
         )
@@ -172,13 +172,27 @@ def main():
     # ---------------------------------------------------------
 
     news_list = build_news(
-        documents,
-        images
+    documents,
+    images
     )
 
     print(
         f"Новостей собрано: {len(news_list)}"
     )
+
+    for news in news_list:
+        print()
+        print("=" * 80)
+        print(f"CONTENT: {news['document_filename']}")
+        print("=" * 80)
+        print(news["content"])
+        print("=" * 80)
+        print()
+        print("=" * 80)
+        print("EXCERPT")
+        print("=" * 80)
+        print(repr(news["excerpt"]))
+        print("=" * 80)
 
     # ---------------------------------------------------------
     # Старый поиск VK в письме

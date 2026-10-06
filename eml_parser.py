@@ -2,7 +2,6 @@ import os
 from email import policy
 from email.parser import BytesParser
 
-
 IMAGE_EXTENSIONS = {
     ".jpg",
     ".jpeg",
@@ -10,7 +9,6 @@ IMAGE_EXTENSIONS = {
     ".webp",
     ".gif",
 }
-
 
 def save_image(image, doc_base, output_dir="extracted_images"):
     """
