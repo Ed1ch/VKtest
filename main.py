@@ -3,7 +3,10 @@ import mimetypes
 import os
 import requests
 
-from config import OUTPUT_DIR
+from config import (
+    OUTPUT_DIR,
+    IMAP_OUTPUT_DIR,
+)
 
 from mail_downloader import (
     download_news_email,
@@ -192,17 +195,43 @@ def process_vk(
 
 
 def process_images(news):
+    """
+    Загружает каждое изображение новости в WordPress только один раз.
+
+    Одна и та же картинка может одновременно использоваться как
+    изображение записи и входить в галерею. В этом случае повторная
+    загрузка в библиотеку WordPress не выполняется: используется тот же
+    media ID.
+    """
+    uploaded_media_ids = {}
+
+    def get_media_id(image_path):
+        normalized_path = os.path.normcase(
+            os.path.abspath(image_path)
+        )
+
+        if normalized_path not in uploaded_media_ids:
+            media = upload_media(
+                image_path
+            )
+
+            uploaded_media_ids[
+                normalized_path
+            ] = media["wp_id"]
+
+        return uploaded_media_ids[
+            normalized_path
+        ]
+
     featured_image = news.get(
         "featured_image"
     )
 
     if featured_image:
-        media = upload_media(
-            featured_image
-        )
-
         news["featured_media_id"] = (
-            media["wp_id"]
+            get_media_id(
+                featured_image
+            )
         )
 
     gallery_images = news.get(
@@ -213,12 +242,10 @@ def process_images(news):
     gallery_media_ids = []
 
     for image_path in gallery_images:
-        media = upload_media(
-            image_path
-        )
-
         gallery_media_ids.append(
-            media["wp_id"]
+            get_media_id(
+                image_path
+            )
         )
 
     news["gallery_media_ids"] = (
@@ -256,6 +283,33 @@ def cleanup_working_files(eml_path):
                 print(
                     f"Не удалось удалить {path}: {error}"
                 )
+
+
+def cleanup_downloaded_eml():
+    """
+    Удаляет все оставшиеся файлы из downloaded_eml.
+
+    Это страховочная очистка всего каталога после завершения main.py,
+    включая завершение с исключением.
+    """
+    if not os.path.isdir(IMAP_OUTPUT_DIR):
+        return
+
+    for filename in os.listdir(
+        IMAP_OUTPUT_DIR
+    ):
+        path = os.path.join(
+            IMAP_OUTPUT_DIR,
+            filename,
+        )
+
+        try:
+            if os.path.isfile(path):
+                os.remove(path)
+        except OSError as error:
+            print(
+                f"Не удалось удалить {path}: {error}"
+            )
 
 
 def process_email(eml_path):
@@ -592,6 +646,15 @@ def main():
         run_pipeline()
 
     finally:
+        # Финальная страховочная очистка рабочих файлов.
+        # cleanup_working_files(None) сохраняет существующую логику
+        # очистки extracted_images.
+        cleanup_working_files(
+            None
+        )
+
+        cleanup_downloaded_eml()
+
         release_process_lock(
             lock_file
         )
