@@ -216,6 +216,19 @@ def cleanup_part(temp_path):
         )
 
 
+def cleanup_eml(path):
+    if not path or not os.path.isfile(path):
+        return
+
+    try:
+        os.remove(path)
+    except OSError as error:
+        print(
+            f"Не удалось удалить локальный EML "
+            f"{path}: {error}"
+        )
+
+
 def download_by_uid(mail, uid):
     """
     Скачивает письмо через BODY.PEEK[] без установки \\Seen.
@@ -262,6 +275,32 @@ def download_by_uid(mail, uid):
         raise
 
 
+def uid_is_seen(mail, uid):
+    """Проверяет, что сервер действительно сохранил флаг \\Seen."""
+    status, data = mail.uid(
+        "fetch",
+        str(uid),
+        "(FLAGS)",
+    )
+    ensure_ok(
+        status,
+        f"Не удалось проверить FLAGS письма UID {uid}.",
+    )
+
+    for part in data:
+        if isinstance(part, tuple):
+            values = part
+        else:
+            values = (part,)
+
+        for value in values:
+            if isinstance(value, (bytes, bytearray)):
+                if b"\\Seen" in value:
+                    return True
+
+    return False
+
+
 def mark_seen_by_uid(mail, uid):
     status, _ = mail.uid(
         "store",
@@ -273,6 +312,11 @@ def mark_seen_by_uid(mail, uid):
         status,
         f"Не удалось пометить письмо UID {uid} как прочитанное.",
     )
+
+    if not uid_is_seen(mail, uid):
+        raise RuntimeError(
+            f"IMAP-сервер не подтвердил флаг SEEN для UID {uid}."
+        )
 
 
 def move_to_trash_by_uid(mail, uid):
@@ -383,9 +427,42 @@ def download_with_retries(uid):
     return None
 
 
+def reserve_downloaded_email(uid, output_path):
+    """
+    Резервирует успешно скачанное письмо перед публикацией.
+
+    Критически важно: WordPress-конвейер не должен стартовать,
+    пока сервер не подтвердил \\Seen.
+    """
+    mail = None
+
+    try:
+        mail = connect_mail()
+        mark_seen_by_uid(
+            mail,
+            uid,
+        )
+        print(
+            f"UID {uid}: помечено SEEN до запуска публикации."
+        )
+
+    except Exception:
+        # Публикация ещё не начиналась. Если не удалось надёжно
+        # зарезервировать письмо, локальный EML удаляем и останавливаемся.
+        cleanup_eml(output_path)
+        raise
+
+    finally:
+        close_mail(mail)
+
+
 def download_news_email():
     """
     Находит и скачивает самое старое UNSEEN-письмо с IMAP_SUBJECT.
+
+    После успешного скачивания письмо ОБЯЗАТЕЛЬНО переводится в SEEN
+    до возврата управления вызывающему коду. Только после этого можно
+    запускать WordPress-публикацию.
 
     Если конкретное письмо не удалось скачать после всех retry,
     оно становится SEEN и функция ищет следующее UNSEEN-письмо.
@@ -412,6 +489,11 @@ def download_news_email():
         )
 
         if output_path is not None:
+            reserve_downloaded_email(
+                uid,
+                output_path,
+            )
+
             return (
                 uid,
                 output_path,
@@ -426,8 +508,10 @@ def download_news_email():
 
 def mark_email_failed(uid):
     """
-    Помечает скачанное, но критически не обработанное письмо как SEEN.
-    Письмо остаётся в INBOX и больше автоматически не подхватывается.
+    Оставляет критически не обработанное письмо как SEEN + INBOX.
+
+    В нормальном потоке письмо уже SEEN ещё до запуска WordPress.
+    Повторная установка флага служит дополнительной проверкой состояния.
     """
     mail = None
 
@@ -446,7 +530,13 @@ def mark_email_failed(uid):
 
 
 def mark_email_processed(uid):
-    """Перемещает полностью успешно обработанное письмо в корзину."""
+    """
+    Перемещает полностью успешно обработанное письмо в корзину.
+
+    Даже если перенос в корзину завершится ошибкой, письмо уже было
+    помечено SEEN до публикации и не должно автоматически публиковаться
+    повторно.
+    """
     mail = None
 
     try:
