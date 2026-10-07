@@ -1,17 +1,5 @@
 import os
 
-# В Windows Terminal / PowerShell включаем ANSI-цвета через colorama.
-# Если библиотека не установлена, вывод останется обычным.
-try:
-    from colorama import Fore, Style, just_fix_windows_console
-except ImportError:
-    GREEN = RED = RESET = ""
-else:
-    just_fix_windows_console()
-    GREEN = Fore.GREEN
-    RED = Fore.RED
-    RESET = Style.RESET_ALL
-
 from eml_parser import extract_attachments
 from news_parser import (
     get_numeric_only_name,
@@ -140,7 +128,7 @@ def inspect_eml(eml_path):
     print("=" * 80)
 
     if unmatched_images:
-        print(f"{RED}Непривязанные картинки:{RESET}")
+        print("Непривязанные картинки:")
 
         for image_filename in unmatched_images:
             print(
@@ -148,14 +136,14 @@ def inspect_eml(eml_path):
             )
     else:
         print(
-            f"{GREEN}Непривязанных картинок нет.{RESET}"
+            "Непривязанных картинок нет."
         )
 
     if ambiguous_images:
         print()
         print(
-            f"{RED}ВНИМАНИЕ: картинки, подошедшие "
-            f"сразу к нескольким DOCX:{RESET}"
+            "ВНИМАНИЕ: картинки, подошедшие "
+            "сразу к нескольким DOCX:"
         )
 
         for image_filename, doc_filenames in (
@@ -171,7 +159,7 @@ def inspect_eml(eml_path):
                 )
     else:
         print(
-            f"{GREEN}Неоднозначных сопоставлений нет.{RESET}"
+            "Неоднозначных сопоставлений нет."
         )
 
 
