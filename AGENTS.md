@@ -61,6 +61,23 @@ Review the diff for regressions, broken contracts, unnecessary complexity and du
 - Do not invent APIs, data structures or project behavior. Inspect the actual code first.
 - When uncertain, state the uncertainty rather than guessing.
 
+## Architectural decisions
+
+When a task results in a significant architectural or design decision, proactively tell the user that it may be worth recording in `gpt_context/DECISIONS.md`.
+
+Do not update `DECISIONS.md` automatically unless the user explicitly approves it.
+
+Examples include:
+
+- changing module responsibilities or boundaries;
+- introducing or removing an architectural pattern;
+- changing important interfaces between modules;
+- choosing a long-term approach when multiple alternatives exist;
+- establishing a project-wide development or processing rule;
+- accepting an important architectural tradeoff.
+
+Do not suggest a `DECISIONS.md` entry for routine bug fixes, minor implementation details, formatting, or temporary experiments.
+
 ## Important project invariants
 
 A failure while processing one news item must **not terminate the entire processing loop**.
