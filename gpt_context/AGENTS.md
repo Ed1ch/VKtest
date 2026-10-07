@@ -4,155 +4,81 @@
 
 VKTest is a Python application that processes incoming email news (`.eml`), extracts text, images and VK links/attachments, processes VK content through the VK API, and publishes the resulting content to WordPress.
 
-Repository:
+Project context is maintained in `gpt_context/`:
 
-https://github.com/Ed1ch/VKtest
-
-Additional LLM context:
-
-```text
-gpt_context/
-```
-
-The Markdown files in `gpt_context/` contain project-specific context and previous architectural decisions.
+- `README.md` — short project overview.
+- `ARCHITECTURE.md` — module boundaries and architecture.
+- `CONTEXT.md` — current development context.
+- `DECISIONS.md` — durable architectural decisions.
 
 ## Source of truth
 
-When working on the project, use this priority:
+For implementation details, use this priority:
 
-1. Current source code in the repository
-2. Relevant documentation in `gpt_context/`
-3. Current conversation
-4. Do not assume that old chat context reflects the current code
+1. Current source code in the repository.
+2. `ARCHITECTURE.md` and `DECISIONS.md`.
+3. `CONTEXT.md`.
+4. Current conversation.
 
-Before making non-trivial changes, inspect the relevant existing code and context.
+Do not assume that old chat context reflects the current code.
 
-## Architecture
+Before making a non-trivial change:
 
-The main processing flow is approximately:
+1. Read `gpt_context/ARCHITECTURE.md`.
+2. Read `gpt_context/CONTEXT.md`.
+3. Read `gpt_context/DECISIONS.md`.
+4. Inspect the actual affected source files.
+5. Search for usages of functions/interfaces being changed.
 
-```text
-Email
-  ↓
-main.py
-  ↓
-download .eml
-  ↓
-EML parsing
-  ↓
-extract links / images / VK objects
-  ↓
-VK API processing
-  ↓
-prepare WordPress content
-  ↓
-WordPress API
-  ↓
-cleanup temporary files
-```
+## Development workflow
 
-Important temporary directories:
+For non-trivial changes use **PLAN -> PATCH -> REVIEW**.
 
-```text
-downloaded_eml/
-extracted_images/
-```
+### PLAN
 
-## Main modules
+Identify affected modules, interfaces and regression risks. Do not modify code yet when the user asks to review the plan first.
 
-* `main.py`
-  Main orchestration loop. Processes one unread email at a time and coordinates the pipeline.
+### PATCH
 
-* `eml_parser.py`
-  Parses `.eml` files and extracts text, HTML and attachments/images.
+Make the smallest change that solves the task. Do not perform unrelated refactoring.
 
-* `eml_links.py`
-  Finds and processes links and VK-related objects in email content.
+### REVIEW
 
-* VK-related modules
-  Communicate with VK API and process VK objects, including videos and nested `attachments`.
-
-* WordPress-related modules
-  Prepare and publish the resulting content through WordPress API.
-
-* `wp_probe.py`
-  Diagnostic utility for testing WordPress API behavior.
-
-* `config.py`
-  Runtime configuration. Secrets and local configuration must not be committed to Git.
-
-## Error handling
-
-A failure while processing one news item must **not terminate the entire processing loop**.
-
-The intended structure is:
-
-```python
-while there are unread messages:
-    download one message
-
-    try:
-        process message
-    except Exception:
-        log/report error
-
-    finally:
-        remove downloaded .eml
-        clean extracted_images/
-```
-
-Cleanup must happen even when processing fails.
+Review the diff for regressions, broken contracts, unnecessary complexity and duplicated functionality. Run relevant tests or perform the available targeted checks.
 
 ## Development rules
 
-* Prefer small, targeted changes over unnecessary rewrites.
-* Preserve existing behavior unless the task explicitly requires changing it.
-* Do not duplicate functionality that already exists in another module.
-* Do not silently change the architecture.
-* Before adding a new helper/module, check whether existing code already provides the required functionality.
-* Keep modules responsible for their own domain.
-* Do not hardcode credentials, tokens or other secrets.
-* Keep temporary files out of Git.
-* Update relevant `gpt_context/*.md` documentation when an architectural decision or important behavior changes.
-* Do not invent APIs, data structures or project behavior. Inspect the actual code first.
-* When uncertain, state the uncertainty rather than guessing.
+- Prefer small, targeted changes over unnecessary rewrites.
+- Preserve existing behavior unless the task explicitly requires changing it.
+- Do not silently change architecture or public contracts between modules.
+- Search for existing functionality before adding a helper or module.
+- Keep modules responsible for their own domain.
+- Prefer simple, explicit Python over clever abstractions.
+- Do not introduce new architectural patterns, base classes, factories, async code or abstraction layers unless they solve a concrete problem in the current task.
+- Do not hardcode credentials, tokens or other secrets.
+- Keep temporary files out of Git.
+- Update relevant `gpt_context/*.md` files when architecture, important behavior or durable decisions change.
+- Do not invent APIs, data structures or project behavior. Inspect the actual code first.
+- When uncertain, state the uncertainty rather than guessing.
 
-## VK-specific notes
+## Important project invariants
 
-VK objects may occur inside nested `attachments`. Do not assume that relevant objects exist only at the top level.
+A failure while processing one news item must **not terminate the entire processing loop**.
 
-For VK videos, the pipeline may need:
+Cleanup of the downloaded `.eml` and `extracted_images/` must happen even when processing fails.
 
-* `owner_id`
-* `video_id`
-* VK API metadata
-* embed information
-* preview image
+VK objects may occur inside nested `attachments`. Preserve recursive attachment handling when modifying VK processing.
 
-Preserve recursive attachment handling when modifying VK processing.
-
-## WordPress
-
-WordPress communication is performed through its API.
-
-`wp_probe.py` can be used to diagnose API availability, authentication and endpoint behavior before modifying the main publishing pipeline.
+`main.py` is the orchestration layer; domain-specific parsing, VK processing and WordPress logic should remain in their relevant modules.
 
 ## Git
 
 GitHub is the canonical repository for the source code.
 
-Normal small code changes should still be committed when they represent a meaningful repository state. Do not create artificial commits solely to document trivial edits.
+Commit meaningful, reviewable states. Avoid unrelated changes in the same commit.
 
 Never commit secrets or local-only configuration.
 
 ## Environment
 
-Current development environment:
-
-```text
-Windows
-Python 3.13.15
-pip 26.2.1
-```
-
-The project should remain compatible with the existing Windows-based development environment unless a task explicitly requires otherwise.
+The project is developed on Windows with Python 3.13. Keep compatibility with the existing environment unless a task explicitly requires otherwise.
