@@ -45,4 +45,4 @@ env/
 # =========================
 
 *.log
-stable_backup/
+/stable_backup/
