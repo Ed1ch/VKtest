@@ -79,6 +79,10 @@ Commit meaningful, reviewable states. Avoid unrelated changes in the same commit
 
 Never commit secrets or local-only configuration.
 
+Never create or use a GitHub fork of this repository unless the user explicitly asks you to do so.
+
+Do not treat a fork as a fallback when direct changes to the repository or branch are unavailable. Ask the user before creating a fork.
+
 ## Environment
 
 The project is developed on Windows with Python 3.13. Keep compatibility with the existing environment unless a task explicitly requires otherwise.
