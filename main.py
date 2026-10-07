@@ -1,8 +1,15 @@
 import html
 import mimetypes
+import os
 import requests
 
-from config import EML_FILE
+from config import OUTPUT_DIR
+
+from mail_downloader import (
+    download_news_email,
+    mark_email_failed,
+    mark_email_processed,
+)
 
 from eml_parser import extract_attachments
 from eml_links import (
@@ -83,9 +90,6 @@ def process_vk(
     if not preview:
         return
 
-    # Для VK-ссылки, найденной непосредственно в DOCX,
-    # preview должен стать изображением записи независимо
-    # от наличия обычной картинки в новости.
     use_preview = (
         force_preview_as_featured
         or not news.get("featured_image")
@@ -144,16 +148,49 @@ def process_images(news):
     )
 
 
-def main():
-    print("=" * 80)
-    print("EML → WORDPRESS")
-    print("=" * 80)
-    print()
+def cleanup_working_files(eml_path):
+    """Удаляет временные файлы конкретной итерации."""
+    if eml_path:
+        try:
+            if os.path.isfile(eml_path):
+                os.remove(eml_path)
+                print(
+                    f"Удалён локальный EML: {eml_path}"
+                )
+        except OSError as error:
+            print(
+                f"Не удалось удалить {eml_path}: {error}"
+            )
 
-    print(f"EML: {EML_FILE}")
+    if os.path.isdir(OUTPUT_DIR):
+        for filename in os.listdir(
+            OUTPUT_DIR
+        ):
+            path = os.path.join(
+                OUTPUT_DIR,
+                filename,
+            )
+
+            try:
+                if os.path.isfile(path):
+                    os.remove(path)
+            except OSError as error:
+                print(
+                    f"Не удалось удалить {path}: {error}"
+                )
+
+
+def process_email(eml_path):
+    """
+    Запускает существующий конвейер для одного EML.
+
+    Возвращает True, только если все критические этапы всех новостей
+    завершились успешно. Ошибка VK является некритичной.
+    """
+    print(f"EML: {eml_path}")
 
     email_data = extract_attachments(
-        EML_FILE
+        eml_path
     )
 
     documents = email_data["documents"]
@@ -167,10 +204,6 @@ def main():
         f"Изображений найдено: {len(images)}"
     )
 
-    # ---------------------------------------------------------
-    # Создание новостей из DOCX
-    # ---------------------------------------------------------
-
     news_list = build_news(
         documents,
         images
@@ -179,10 +212,6 @@ def main():
     print(
         f"Новостей собрано: {len(news_list)}"
     )
-
-    # ---------------------------------------------------------
-    # Старый поиск VK в письме
-    # ---------------------------------------------------------
 
     vk_links = extract_vk_links(
         email_data,
@@ -193,10 +222,6 @@ def main():
         item["document"]: item
         for item in vk_links
     }
-
-    # ---------------------------------------------------------
-    # Новый поиск VK непосредственно внутри DOCX
-    # ---------------------------------------------------------
 
     vk_links_from_docx = (
         extract_vk_links_from_docx(
@@ -209,12 +234,7 @@ def main():
         for item in vk_links_from_docx
     }
 
-    # ---------------------------------------------------------
-    # Вывод найденных VK-ссылок
-    # ---------------------------------------------------------
-
     print()
-
     print("=" * 80)
     print("VK ССЫЛКИ ИЗ ПИСЬМА")
     print("=" * 80)
@@ -238,7 +258,6 @@ def main():
         )
 
     print()
-
     print("=" * 80)
     print("VK ССЫЛКИ ИЗ DOCX")
     print("=" * 80)
@@ -261,16 +280,13 @@ def main():
             "в DOCX не найдено."
         )
 
-    # ---------------------------------------------------------
-    # Обработка новостей
-    # ---------------------------------------------------------
+    email_ok = True
 
     for number, news in enumerate(
         news_list,
         start=1
     ):
         print()
-
         print("=" * 80)
         print(
             f"NEWS #{number}: "
@@ -279,19 +295,11 @@ def main():
         print("=" * 80)
 
         try:
-            # -------------------------------------------------
-            # 1. Обычные изображения
-            # -------------------------------------------------
-
             print(
                 "\n[1] Обработка изображений..."
             )
 
             process_images(news)
-
-            # -------------------------------------------------
-            # 2. Поиск VK
-            # -------------------------------------------------
 
             print(
                 "\n[2] Поиск VK..."
@@ -301,8 +309,6 @@ def main():
                 news["document_filename"]
             )
 
-            # Сначала ищем ссылку непосредственно
-            # внутри DOCX.
             vk_info = (
                 vk_by_document_from_docx.get(
                     document_filename
@@ -317,17 +323,12 @@ def main():
                     f"внутри DOCX: "
                     f"{document_filename}"
                 )
-
                 print(
                     f'URL: {vk_info["url"]}'
                 )
-
                 force_preview_as_featured = True
 
             else:
-                # Если в DOCX ссылки нет, полностью
-                # сохраняется старый механизм:
-                # используем VK-ссылку из письма.
                 vk_info = vk_by_document.get(
                     document_filename
                 )
@@ -338,7 +339,6 @@ def main():
                         f"в письме для "
                         f"{document_filename}"
                     )
-
                 else:
                     print(
                         "VK-ссылка для этой новости "
@@ -346,15 +346,22 @@ def main():
                     )
 
             if vk_info:
-                process_vk(
-                    news,
-                    vk_info,
-                    force_preview_as_featured
-                )
-
-            # -------------------------------------------------
-            # 3. Создание записи WordPress
-            # -------------------------------------------------
+                try:
+                    process_vk(
+                        news,
+                        vk_info,
+                        force_preview_as_featured
+                    )
+                except Exception as error:
+                    # Ошибка VK не блокирует публикацию новости.
+                    print(
+                        "\nПРЕДУПРЕЖДЕНИЕ VK:"
+                    )
+                    print(error)
+                    print(
+                        "Новость будет опубликована "
+                        "без VK-видео/preview."
+                    )
 
             print(
                 "\n[3] Создание записи..."
@@ -365,31 +372,130 @@ def main():
             print(
                 "\nГотово:"
             )
-
             print(
                 f"ID: {post['id']}"
             )
-
             print(
                 f"URL: {post.get('link')}"
             )
-
             print(
                 f"Статус: {post.get('status')}"
             )
 
-        except Exception as e:
+        except Exception as error:
+            # Критическая ошибка одной новости не мешает попробовать
+            # обработать остальные новости этого письма, но само письмо
+            # после этого не будет удалено из INBOX.
+            email_ok = False
+
             print(
                 "\nОШИБКА:"
             )
+            print(error)
+            print(
+                "Новость не обработана полностью. "
+                "Переходим к следующей новости письма."
+            )
 
-            print(e)
+    return email_ok
+
+
+def main():
+    print("=" * 80)
+    print("MAIL → EML → WORDPRESS")
+    print("=" * 80)
+
+    processed_emails = 0
+    failed_emails = 0
+
+    while True:
+        print()
+        print("=" * 80)
+        print("ПОИСК СЛЕДУЮЩЕГО ПИСЬМА")
+        print("=" * 80)
+
+        downloaded = download_news_email()
+
+        if downloaded is None:
+            print(
+                "Непрочитанных ЗГП-писем "
+                "для обработки больше нет."
+            )
+            break
+
+        uid, eml_path, subject = downloaded
+
+        print()
+        print("=" * 80)
+        print(
+            f"ОБРАБОТКА ПИСЬМА UID {uid}"
+        )
+        print("=" * 80)
+        print(
+            f"Subject: {subject}"
+        )
+
+        email_ok = False
+
+        try:
+            email_ok = process_email(
+                eml_path
+            )
+
+        except Exception as error:
+            # Ошибки уровня всего письма: EML parser, build_news,
+            # построение карты VK и т.п.
+            print()
+            print(
+                "КРИТИЧЕСКАЯ ОШИБКА ОБРАБОТКИ ПИСЬМА:"
+            )
+            print(error)
+            email_ok = False
+
+        finally:
+            cleanup_working_files(
+                eml_path
+            )
+
+        try:
+            if email_ok:
+                mark_email_processed(
+                    uid
+                )
+                processed_emails += 1
+            else:
+                mark_email_failed(
+                    uid
+                )
+                failed_emails += 1
+
+        except Exception as error:
+            # Если не удалось зафиксировать состояние письма на IMAP,
+            # безопаснее остановить запуск: иначе это же UNSEEN-письмо
+            # может попасть в цикл повторно.
+            print()
+            print(
+                "КРИТИЧЕСКАЯ ОШИБКА IMAP:"
+            )
+            print(error)
+            print(
+                "Не удалось надёжно изменить состояние письма. "
+                "Работа остановлена."
+            )
+            raise
 
     print()
-
     print("=" * 80)
     print("ГОТОВО")
     print("=" * 80)
+    print(
+        f"Успешно обработано писем: "
+        f"{processed_emails}"
+    )
+    print(
+        f"Оставлено в INBOX как SEEN "
+        f"после ошибок: {failed_emails}"
+    )
 
 
 if __name__ == "__main__":
