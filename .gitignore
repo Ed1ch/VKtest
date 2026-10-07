@@ -46,3 +46,5 @@ env/
 
 *.log
 /stable_backup/
+*_test
+test_*
