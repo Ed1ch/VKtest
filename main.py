@@ -380,7 +380,6 @@ def print_image_matching_report(documents, images):
     else:
         print("Неоднозначных сопоставлений нет.")
 
-    print("Проверка информационная; публикация не блокируется.")
 
 
 def process_email(eml_path):
