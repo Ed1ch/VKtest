@@ -92,6 +92,12 @@ VK objects may occur inside nested `attachments`. Preserve recursive attachment 
 
 GitHub is the canonical repository for the source code.
 
+**Do not transfer code or other changes from test/working branches into `main` without the user's explicit instruction.**
+
+- A request to write code, test it, or commit it is not permission to merge into `main`.
+- Never merge, cherry-pick, or otherwise bring a test/working branch into `main` on your own initiative.
+- Once changes are ready, report the branch and commit, then wait for the user's direct approval before updating `main` with those changes.
+
 Commit meaningful, reviewable states. Avoid unrelated changes in the same commit.
 
 Never commit secrets or local-only configuration.
