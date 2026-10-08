@@ -10,16 +10,79 @@ from io import BytesIO
 from eml_parser import save_image
 
 
-def normalize_name(name):
-    base = os.path.splitext(name)[0]
+# Числительные прописью игнорируются при сопоставлении имён.
+# Список можно дополнять по результатам тестирования.
+NUMBER_WORDS = {
+    "ноль", "один", "одна", "одно", "два", "две",
+    "три", "четыре", "пять", "шесть", "семь",
+    "восемь", "девять", "десять", "одиннадцать",
+    "двенадцать", "тринадцать", "четырнадцать",
+    "пятнадцать", "шестнадцать", "семнадцать",
+    "восемнадцать", "девятнадцать", "двадцать",
+    "тридцать", "сорок", "пятьдесят", "шестьдесят",
+    "семьдесят", "восемьдесят", "девяносто",
+    "сто", "двести", "триста", "четыреста",
+    "пятьсот", "шестьсот", "семьсот",
+    "восемьсот", "девятьсот", "тысяча",
+    "тысячи", "тысяч",
+}
 
-    base = re.sub(
-        r"\d+$",
-        "",
-        base
+
+def normalize_match_words(filename):
+    """
+    Приводит имя файла к набору значимых слов для сопоставления.
+
+    Правила нормализации изолированы здесь, чтобы их можно было
+    расширять по результатам ручного тестирования.
+    """
+    base = os.path.splitext(filename)[0].casefold()
+
+    base = re.sub(r"[_-]+", " ", base)
+    base = re.sub(r"\d+", " ", base)
+    base = re.sub(r"[^a-zа-яё\s]", " ", base)
+    base = re.sub(r"\s+", " ", base).strip()
+
+    return {
+        word
+        for word in base.split()
+        if word not in NUMBER_WORDS
+    }
+
+
+def get_numeric_only_name(filename):
+    """
+    Возвращает имя как число, если до расширения находятся только цифры.
+    """
+    base = os.path.splitext(filename)[0].strip()
+
+    if re.fullmatch(r"\d+", base):
+        return base
+
+    return None
+
+
+def names_match(document_filename, image_filename):
+    """
+    Определяет, относится ли изображение к документу.
+
+    Для текстовых имён все слова документа должны присутствовать
+    в нормализованном имени изображения. Для чисто числовых имён
+    используется точное сравнение числа.
+    """
+    doc_words = normalize_match_words(document_filename)
+    image_words = normalize_match_words(image_filename)
+
+    if doc_words:
+        return doc_words.issubset(image_words)
+
+    doc_number = get_numeric_only_name(document_filename)
+    image_number = get_numeric_only_name(image_filename)
+
+    return (
+        doc_number is not None
+        and image_number is not None
+        and doc_number == image_number
     )
-
-    return base.strip()
 
 
 def check_pandoc():
@@ -345,19 +408,6 @@ def natural_image_sort(images):
 
 def build_news(documents, images):
 
-    images_by_news = {}
-
-    for image in images:
-
-        news_name = normalize_name(
-            image["filename"]
-        )
-
-        images_by_news.setdefault(
-            news_name,
-            []
-        ).append(image)
-
     news_list = []
 
     for document in documents:
@@ -372,10 +422,14 @@ def build_news(documents, images):
             doc_filename
         )[0]
 
-        news_images = images_by_news.get(
-            doc_base,
-            []
-        )
+        news_images = [
+            image
+            for image in images
+            if names_match(
+                doc_filename,
+                image["filename"]
+            )
+        ]
 
         news_images = natural_image_sort(
             news_images
