@@ -18,7 +18,7 @@
 
 ## Project
 
-VKTest is a Python application that processes incoming email news (`.eml`), extracts text, images and VK links/attachments, processes VK content through the VK API, and publishes the resulting content to WordPress.
+zanevka newsbot is a Python application that processes incoming email news (`.eml`), extracts text, images and VK links/attachments, processes VK content through the VK API, and publishes the resulting content to WordPress.
 
 Project context is maintained in `gpt_context/`:
 
