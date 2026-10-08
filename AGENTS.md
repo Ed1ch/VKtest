@@ -1,5 +1,21 @@
 # AGENTS.md
 
+## Repository safety rules — mandatory
+
+**Branch protection is a hard requirement, not a workflow preference.**
+
+1. Never modify `main` by transferring, copying, merging, cherry-picking, recreating, or manually reimplementing changes from another branch unless the user explicitly authorizes that specific transfer into `main`.
+2. Authorization must be clear and unambiguous. Requests such as "fix this", "implement this feature", "use the tested solution", "finish the task", "commit the changes", or "the test branch works" do NOT authorize modifying `main` using changes from another branch.
+3. Before any cross-branch transfer into `main`, explicitly identify the source branch, target branch (`main`), and changes to be transferred. Ask the user for confirmation and wait for their response.
+4. Never infer authorization from technical readiness, successful tests, previous discussions, or the fact that a solution has already been implemented in a working branch.
+5. If the requested target branch is ambiguous, ask the user. Do not silently default to `main`.
+6. Do not bypass these rules by manually copying code instead of performing a Git merge or cherry-pick.
+7. Reading, comparing and reviewing branches is allowed without approval. Modifying `main` using changes from another branch is not.
+8. Before any GitHub write operation, verify that the destination branch matches the user's authorization.
+9. Never create or use a repository fork without the user's explicit permission.
+
+**When in doubt, stop and ask.**
+
 ## Project
 
 VKTest is a Python application that processes incoming email news (`.eml`), extracts text, images and VK links/attachments, processes VK content through the VK API, and publishes the resulting content to WordPress.
@@ -37,6 +53,8 @@ For non-trivial changes use **PLAN -> PATCH -> REVIEW**.
 ### PLAN
 
 Identify affected modules, interfaces and regression risks. Do not modify code yet when the user asks to review the plan first.
+
+Before PATCH, identify the target Git branch and verify that the requested changes are authorized for that branch. If the target branch is unclear, ask before modifying repository files.
 
 ### PATCH
 
