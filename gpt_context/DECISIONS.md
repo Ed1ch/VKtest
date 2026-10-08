@@ -1,4 +1,4 @@
-# VKTest Decisions
+# zanevka newsbot Decisions
 
 Короткий журнал устойчивых решений. Не записывать сюда каждую мелкую правку.
 

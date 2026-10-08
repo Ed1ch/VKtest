@@ -1,4 +1,4 @@
-# VKTest Architecture
+# zanevka newsbot Architecture
 
 Краткая карта архитектуры проекта. Обновлять при изменении границ ответственности модулей.
 
