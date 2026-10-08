@@ -19,7 +19,10 @@ from eml_links import (
     extract_vk_links,
     extract_vk_links_from_docx,
 )
-from news_parser import build_news
+from news_parser import (
+    build_news,
+    find_matching_images,
+)
 
 from image_manager import (
     upload_media,
@@ -312,6 +315,73 @@ def cleanup_downloaded_eml():
             )
 
 
+def print_image_matching_report(documents, images):
+    """
+    Показывает привязку картинок до публикации.
+    Отчёт информационный и не влияет на обработку новостей.
+    """
+    print()
+    print("=" * 80)
+    print("ПРОВЕРКА СОПОСТАВЛЕНИЯ DOCX И ИЗОБРАЖЕНИЙ")
+    print("=" * 80)
+
+    matched_by_image = {
+        image["filename"]: []
+        for image in images
+    }
+
+    for document in documents:
+        doc_filename = document["filename"]
+        matched_images = find_matching_images(
+            doc_filename,
+            images
+        )
+
+        print()
+        print(f"DOCX: {doc_filename}")
+
+        if not matched_images:
+            print("  Картинки: НЕ НАЙДЕНЫ")
+            continue
+
+        for image in matched_images:
+            image_filename = image["filename"]
+            print(f"  ✓ {image_filename}")
+            matched_by_image[image_filename].append(
+                doc_filename
+            )
+
+    unmatched_images = [
+        filename
+        for filename, matched_docs in matched_by_image.items()
+        if not matched_docs
+    ]
+
+    ambiguous_images = {
+        filename: matched_docs
+        for filename, matched_docs in matched_by_image.items()
+        if len(matched_docs) > 1
+    }
+
+    print()
+    if unmatched_images:
+        print("Непривязанные картинки:")
+        for filename in unmatched_images:
+            print(f"  ! {filename}")
+    else:
+        print("Непривязанных картинок нет.")
+
+    if ambiguous_images:
+        print("ВНИМАНИЕ: неоднозначные сопоставления:")
+        for filename, matched_docs in ambiguous_images.items():
+            print(f"  ! {filename}")
+            for doc_filename in matched_docs:
+                print(f"      -> {doc_filename}")
+    else:
+        print("Неоднозначных сопоставлений нет.")
+
+
+
 def process_email(eml_path):
     """
     Запускает существующий конвейер для одного EML.
@@ -334,6 +404,11 @@ def process_email(eml_path):
 
     print(
         f"Изображений найдено: {len(images)}"
+    )
+
+    print_image_matching_report(
+        documents,
+        images
     )
 
     news_list = build_news(

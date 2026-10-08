@@ -85,6 +85,18 @@ def names_match(document_filename, image_filename):
     )
 
 
+def find_matching_images(document_filename, images):
+    """
+    Выбирает изображения для документа по тем же правилам,
+    которые используются в тестовом стенде.
+    """
+    return [
+        image
+        for image in images
+        if names_match(document_filename, image["filename"])
+    ]
+
+
 def check_pandoc():
     """
     Проверяет наличие Pandoc в PATH.
@@ -422,14 +434,10 @@ def build_news(documents, images):
             doc_filename
         )[0]
 
-        news_images = [
-            image
-            for image in images
-            if names_match(
-                doc_filename,
-                image["filename"]
-            )
-        ]
+        news_images = find_matching_images(
+            doc_filename,
+            images
+        )
 
         news_images = natural_image_sort(
             news_images
