@@ -126,4 +126,6 @@ Do not treat a fork as a fallback when direct changes to the repository or branc
 
 ## Environment
 
-The project is developed on Windows with Python 3.13. Keep compatibility with the existing environment unless a task explicitly requires otherwise.
+The project is developed on Windows 10 with Python 3.13. Keep compatibility with the existing environment unless a task explicitly requires otherwise.
+
+Target Windows 10 and Unix (primarily Debian Linux and FreeBSD) from a single codebase. Avoid OS-specific file paths and scheduling assumptions in shared application logic. Configure periodic runs externally (Windows Task Scheduler or Unix cron); verify Python dependencies, Pandoc and filesystem behavior on each target platform before claiming compatibility.
