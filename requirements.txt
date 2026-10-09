@@ -1,0 +1,6 @@
+# Runtime dependencies for Zanevka Newsbot.
+# Shared by Windows 10, Debian Linux and FreeBSD.
+requests>=2.32.5,<3.0
+python-docx>=1.2.0,<2.0
+
+# System dependency (install separately, not through pip): Pandoc.
